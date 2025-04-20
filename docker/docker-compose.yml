@@ -8,19 +8,19 @@ services:
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - PYTHONPATH=/app
     ports:
-      - "8080:8080"  # Spark Web UI
-      - "7077:7077"  # Spark Master port
+      - "8080:8080"
+      - "7077:7077"
     volumes:
-      - ./bronze:/app/bronze
-      - ./sliver:/app/sliver
-      - ./ETL:/app/ETL
-      - ./Storage_Data:/app/Storage_Data
-    working_dir: /app/ETL
-    command: spark-submit dim_fact_table.py
+      - ../datasets:/app/datasets
+      - ../data:/app/data
+      - ../ETL:/app/ETL
+    working_dir: /app
+    networks:
+      - datawarehouse
 
-  spark-worker-1:
+  spark-worker:
     image: bitnami/spark:latest
-    container_name: spark-worker-1
+    container_name: spark-worker
     depends_on:
       - spark-master
     environment:
@@ -28,3 +28,28 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
     ports:
       - "8081:8081"
+    networks:
+      - datawarehouse
+
+  postgresql:
+    image: postgres:14
+    container_name: postgresql
+    hostname: postgresql
+    environment:
+      - POSTGRES_USER=datawarehouse
+      - POSTGRES_PASSWORD=datawarehouse
+      - POSTGRES_DB=datawarehouse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../data/gold:/gold
+    ports:
+      - "5432:5432"
+    networks:
+      - datawarehouse
+
+volumes:
+  postgres_data:
+
+networks:
+  datawarehouse:
+    driver: bridge

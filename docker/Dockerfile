@@ -2,6 +2,8 @@ FROM bitnami/spark:latest
 
 USER root
 
-RUN apt-get update && apt-get install -y python3-pip && pip3 install numpy
+COPY jars/postgresql-42.4.5.jar /opt/bitnami/spark/jars/
+
+RUN pip install psycopg2-binary
 
 USER 1001
