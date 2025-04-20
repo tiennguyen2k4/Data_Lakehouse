@@ -1,110 +1,109 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import regexp_replace, col, when, regexp_extract, expr, udf, lit
-from pyspark.sql.types import DateType
-import numpy as np
-from datetime import datetime, timedelta
+from pyspark.sql.functions import to_date
+from pyspark.sql.functions import regexp_replace, col, when, regexp_extract, expr, lit
+from pyspark.sql.types import IntegerType
+
+spark = SparkSession.builder \
+    .appName("product_data") \
+    .config("spark.sql.parquet.writeLegacyFormat", "false") \
+    .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
+    .getOrCreate()
+
+# Read data from Bronze Layer
+df_crm_prd = spark.read.parquet("/app/data/bronze/source_crm/products")
+df_erp_cat = spark.read.parquet("/app/data/bronze/source_erp/product_categories")
+
+# Transform ID
+df_crm_prd = df_crm_prd.withColumn("ID", regexp_extract("prd_key", r'(.{5})', 1))
+df_erp_cat = df_erp_cat.withColumn("ID", regexp_replace("ID", "_", "-"))
 
 
-def change_date(start_date, end_date):
-    start = datetime.strptime(start_date, "%Y-%m-%d")
-    end = datetime.strptime(end_date, "%Y-%m-%d")
-    days_between = (end - start).days
+# Join data
+df_prd = df_crm_prd.join(df_erp_cat, "ID", "inner") \
+    .filter(col("CAT").isNotNull() & col("prd_cost").isNotNull())
 
-    def random_date():
-        return start + timedelta(days=np.random.randint(days_between))
+# Handle null values
+df_prd = df_prd.withColumn("prd_line",
+    when(col("prd_line").isNull(), lit(None)).otherwise(col("prd_line")))
 
-    return udf(random_date, DateType())
+# Create color column
+df_prd = df_prd.withColumn(
+    "color",
+    when(
+        regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$", 1) != "",
+        regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$", 1)
+    ).when(
+        regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*$", 1) != "",
+        regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*$", 1)
+    ).otherwise(lit(None))
+)
 
+df_prd = df_prd.withColumn(
+    "size",
+    when(
+        regexp_extract(col("prd_nm"), "-\\s*(\\d+|[A-Z]{1,3})\\s*$", 1) != "",
+        regexp_extract(col("prd_nm"), "-\\s*(\\d+|[A-Z]{1,3})\\s*$", 1)
+    ).otherwise(lit(None))
+)
 
-def prd_data():
-    spark = SparkSession.builder \
-        .appName("product_data") \
-        .getOrCreate()
+df_prd = df_prd.withColumn(
+    "color",
+    expr("""
+        CASE
+            WHEN color = size AND size IS NOT NULL THEN NULL
+            ELSE color
+        END
+    """)
+)
 
-    # Đọc dữ liệu
-    df_crm_prd = spark.read.csv("../bronze/source_crm/prd_info.csv", header=True)
-    df_erp_cat = spark.read.csv("../bronze/source_erp/PX_CAT_G1V2.csv", header=True)
-
-    # Chuẩn hóa ID
-    df_crm_prd = df_crm_prd.withColumn("ID", regexp_extract("prd_key", r'(.{5})', 1))
-    df_erp_cat = df_erp_cat.withColumn("ID", regexp_replace("ID", "_", "-"))
-
-    # Join dữ liệu
-    df_prd = df_crm_prd.join(df_erp_cat, "ID", "inner")
-    df_prd = df_prd.filter(col("CAT").isNotNull() & col("prd_cost").isNotNull())
-
-    # Xử lý giá trị null
-    df_prd = df_prd.withColumn("prd_line", when(col("prd_line").isNull(), lit("null")).otherwise(col("prd_line")))
-    df_prd = df_prd.withColumn("prd_end_dt", when(col("prd_end_dt").isNull(), lit("null")).otherwise(col("prd_end_dt")))
-
-    # Tạo ngày ngẫu nhiên
-    random_date_start = change_date("2018-01-01", "2020-01-01")
-    random_date_end = change_date("2022-01-01", "2023-01-01")
-
-    df_prd = df_prd.withColumn("prd_start_dt", random_date_start())
-    df_prd = df_prd.withColumn("prd_end_dt",
-                               when(col("prd_end_dt") != "null", random_date_end())
-                               .otherwise(lit("null").cast(DateType())))
-
-    # Trích xuất màu sắc và kích thước
-    df_prd = df_prd.withColumn(
-        "color",
-        when(
-            regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$", 1) != "",
-            regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$", 1)
-        ).when(
-            regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*$", 1) != "",
-            regexp_extract(col("prd_nm"), "-\\s*([A-Za-z]+)\\s*$", 1)
-        ).otherwise(lit("null"))
+# Create prd_name column
+df_prd = df_prd.withColumn(
+    "prd_name",
+    regexp_replace(
+        col("prd_nm"),
+        "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$|" +
+        "-\\s*([A-Za-z]+)\\s*$|" +
+        "-\\s*(\\d+|[A-Z]{1,3})\\s*$",
+        ""
     )
+).withColumn(
+    "prd_key",
+    expr("regexp_replace(prd_key, CONCAT('^', ID, '-'), '')")
+)
 
-    df_prd = df_prd.withColumn(
-        "size",
-        when(
-            regexp_extract(col("prd_nm"), "-\\s*(\\d+|[A-Z]{1,3})\\s*$", 1) != "",
-            regexp_extract(col("prd_nm"), "-\\s*(\\d+|[A-Z]{1,3})\\s*$", 1)
-        ).otherwise(lit("null"))
-    )
-
-    # Xử lý trường hợp color trùng size
-    df_prd = df_prd.withColumn(
-        "color",
-        expr("""
-            CASE
-                WHEN color = size AND size != 'null' THEN 'null'
-                ELSE color
-            END
-        """)
-    )
-
-    # Chuẩn hóa tên sản phẩm
-    df_prd = df_prd.withColumn(
-        "prd_name",
-        regexp_replace(
-            col("prd_nm"),
-            "-\\s*([A-Za-z]+)\\s*-\\s*(\\d+|[A-Z]{1,3})$|" +
-            "-\\s*([A-Za-z]+)\\s*$|" +
-            "-\\s*(\\d+|[A-Z]{1,3})\\s*$",
-            ""
-        )
-    )
-
-    # Chuẩn hóa prd_key
-    df_prd = df_prd.withColumn(
-        "prd_key",
-        expr("""
-            CASE
-                WHEN ID IS NOT NULL THEN regexp_replace(prd_key, CONCAT('^', ID, '-'), '')
-                ELSE prd_key
-            END
-        """)
-    )
-
-    return df_prd
-
-if __name__ == "__main__":
-    df = prd_data()
-    df.show(5)
-    df.describe().show()
+df_prd = df_prd.withColumn("prd_id", col("prd_id").cast(IntegerType()))
+df_prd = df_prd.withColumn("prd_cost", col("prd_cost").cast(IntegerType()))
+df_prd = df_prd.withColumn("prd_start_dt", to_date(col("prd_start_dt"), "MM/dd/yyyy"))
+df_prd = df_prd.dropDuplicates(["prd_key"])
 
 
+# Create dim_prd table
+dim_prd = df_prd.select(
+    col("prd_id"),
+    col("ID").alias("cat_id"),
+    col("CAT").alias("cat_name"),
+    col("SUBCAT").alias("subcat_name"),
+    col("prd_key"),
+    col("prd_name"),
+    col("color"),
+    col("size"),
+    col("prd_cost"),
+    col("prd_line"),
+    col("prd_start_dt"),
+    col("MAINTENANCE").alias("maintenance"),
+    lit("CRM+ERP").alias("prd_data_source")
+)
+
+# Check qualified data
+assert dim_prd.count() > 0, "Error: Empty DataFrame"
+assert dim_prd.filter(col("prd_id").isNull()).count() == 0, "Error: prd_id contains null"
+
+# Write to Silver Layer
+dim_prd.write \
+    .mode("overwrite") \
+    .format("parquet") \
+    .save("/app/data/silver/dim_product")
+
+print("Successfully")
+
+spark.stop()
