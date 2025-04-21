@@ -2,8 +2,8 @@ FROM bitnami/spark:latest
 
 USER root
 
-COPY jars/postgresql-42.4.5.jar /opt/bitnami/spark/jars/
+COPY jars/* /opt/bitnami/spark/jars/
 
-RUN pip install psycopg2-binary
+RUN pip install psycopg2-binary python-dotenv
 
 USER 1001
