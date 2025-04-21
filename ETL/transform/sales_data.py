@@ -1,16 +1,14 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import concat_ws, col, date_add, expr
 from pyspark.sql.types import IntegerType
+from ETL.spark_session import get_spark_session
 
-spark = SparkSession.builder \
-    .appName("sales_data") \
-    .getOrCreate()
+spark = get_spark_session("sales_data")
 
 # Read data from sliver and bronze layer
-df_crm_sales = spark.read.parquet("/app/data/bronze/source_crm/sales")
-dim_customer = spark.read.parquet("/app/data/silver/dim_customer")
-dim_product = spark.read.parquet("/app/data/silver/dim_product")
-dim_date = spark.read.parquet("/app/data/silver/dim_date")
+df_crm_sales = spark.read.parquet("s3a://data/bronze/source_crm/sales")
+dim_customer = spark.read.parquet("s3a://data/silver/dim_customer")
+dim_product = spark.read.parquet("s3a://data/silver/dim_product")
+dim_date = spark.read.parquet("s3a://data/silver/dim_date")
 
 # Clean data
 df_crm_sales = df_crm_sales.withColumn("sls_cst_prd_id", concat_ws("_",df_crm_sales["sls_cust_id"], df_crm_sales["sls_prd_key"]))
@@ -55,7 +53,8 @@ assert fact_sales.count() > 0, "Error: Empty DataFrame"
 fact_sales.write \
     .mode("overwrite") \
     .format("parquet") \
-    .save("/app/data/silver/fact_sales")
+    .save("s3a://data/silver/fact_sales")
+
 
 print("Successfully")
 

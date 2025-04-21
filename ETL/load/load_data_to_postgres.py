@@ -1,4 +1,4 @@
-from pyspark.sql import SparkSession
+from ETL.spark_session import get_spark_session
 
 postgres_config = {
     "url": "jdbc:postgresql://postgresql:5432/datawarehouse",
@@ -6,11 +6,6 @@ postgres_config = {
     "password": "datawarehouse",
     "driver": "org.postgresql.Driver"
 }
-
-def create_spark_session():
-    return SparkSession.builder \
-            .appName("load_data_to_postgres") \
-            .getOrCreate()
 
 def load_data(spark, table_name, silver_path):
     try:
@@ -31,9 +26,9 @@ def load_data(spark, table_name, silver_path):
         raise
 
 def main():
-    spark = create_spark_session()
+    spark = get_spark_session("load_data_to_postgres")
 
-    silver_path = "/app/data/silver"
+    silver_path = "s3a://data/silver"
     TABLES = ["dim_customer", "dim_date", "dim_product", "fact_sales"]
 
     for table_name in TABLES:

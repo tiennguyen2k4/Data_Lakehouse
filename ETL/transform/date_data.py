@@ -1,4 +1,4 @@
-from pyspark.sql import SparkSession
+from ETL.spark_session import get_spark_session
 from pyspark.sql.functions import col, expr, dayofmonth, month, year, quarter, to_date, date_format
 from datetime import datetime, timedelta
 
@@ -8,9 +8,7 @@ def generate_date_range(start_date, end_date):
     return [(start + timedelta(days=i),) for i in range((end - start).days + 1)]
 
 # config SparkSession
-spark = SparkSession.builder \
-    .appName("date_dimension") \
-    .getOrCreate()
+spark = get_spark_session("date_data")
 
 # Create date range from 2017-01-01 to 2024-12-31
 date_list = generate_date_range("2017-01-01", "2024-12-31")
@@ -38,7 +36,7 @@ assert dim_date.count() == (datetime(2024, 12, 31) - datetime(2017, 1, 1)).days 
 dim_date.write \
     .mode("overwrite") \
     .format("parquet") \
-    .save("/app/data/silver/dim_date")
+    .save("s3a://data/silver/dim_date")
     
 print("Successfully")
 

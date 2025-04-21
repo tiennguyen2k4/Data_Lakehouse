@@ -1,17 +1,13 @@
-from pyspark.sql import SparkSession
+from ETL.spark_session import get_spark_session
 from pyspark.sql.functions import to_date
 from pyspark.sql.functions import regexp_replace, col, when, regexp_extract, expr, lit
 from pyspark.sql.types import IntegerType
 
-spark = SparkSession.builder \
-    .appName("product_data") \
-    .config("spark.sql.parquet.writeLegacyFormat", "false") \
-    .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
-    .getOrCreate()
+spark = get_spark_session("product_data")
 
 # Read data from Bronze Layer
-df_crm_prd = spark.read.parquet("/app/data/bronze/source_crm/products")
-df_erp_cat = spark.read.parquet("/app/data/bronze/source_erp/product_categories")
+df_crm_prd = spark.read.parquet("s3a://data/bronze/source_crm/products")
+df_erp_cat = spark.read.parquet("s3a://data/bronze/source_erp/product_categories")
 
 # Transform ID
 df_crm_prd = df_crm_prd.withColumn("ID", regexp_extract("prd_key", r'(.{5})', 1))
@@ -102,7 +98,7 @@ assert dim_prd.filter(col("prd_id").isNull()).count() == 0, "Error: prd_id conta
 dim_prd.write \
     .mode("overwrite") \
     .format("parquet") \
-    .save("/app/data/silver/dim_product")
+    .save("s3a://data/silver/dim_product")
 
 print("Successfully")
 

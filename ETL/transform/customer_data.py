@@ -1,19 +1,13 @@
-from pyspark.sql import SparkSession
 from pyspark.sql.functions import trim, regexp_replace, col, when, to_date, current_date, lit, concat_ws, floor, datediff
 from pyspark.sql.types import IntegerType
+from ETL.spark_session import get_spark_session
 
-# SparkSession configuration
-spark = SparkSession.builder \
-    .appName("customer_data") \
-    .config("spark.sql.parquet.datetimeRebaseModeInWrite", "CORRECTED") \
-    .config("spark.sql.parquet.writeLegacyFormat", "false") \
-    .config("spark.sql.legacy.timeParserPolicy", "LEGACY") \
-    .getOrCreate()
+spark = get_spark_session("customer_data")
 
 # Read data from bronze
-df_crm_cust = spark.read.parquet("/app/data/bronze/source_crm/customers")
-df_erp_cust = spark.read.parquet("/app/data/bronze/source_erp/customers")
-df_erp_loc = spark.read.parquet("/app/data/bronze/source_erp/locations")
+df_crm_cust = spark.read.parquet("s3a://data/bronze/source_crm/customers")
+df_erp_cust = spark.read.parquet("s3a://data/bronze/source_erp/customers")
+df_erp_loc = spark.read.parquet("s3a://data/bronze/source_erp/locations")
 
 # Clean data ERP Location
 df_erp_loc = df_erp_loc.withColumnRenamed("CID", "CID_loc")
@@ -89,7 +83,7 @@ assert dim_cust.count() > 0, "Error: No data in dim_customer"
 dim_cust.write \
     .mode("overwrite") \
     .format("parquet") \
-    .save("/app/data/silver/dim_customer")
+    .save("s3a://data/silver/dim_customer")
 
 print("Successfully")
 
