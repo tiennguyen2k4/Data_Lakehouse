@@ -1,20 +1,25 @@
-# Data Warehouse Architecture using Apache Spark, PostgreSQL, and Power BI
+# Data Lakehouse Architecture using Apache Spark, Minio, PostgreSQL, and Power BI
 
-This project illustrates a modern **Data Warehouse** architecture implemented with **Docker**, following the **Medallion Architecture** pattern (Bronze → Silver → Gold).
+This project illustrates a modern **Data Lakehouse** architecture implemented with **Docker**, following the **Medallion Architecture** pattern (Bronze → Silver → Gold).
 
 ## 📊 Overview
 
-The system extracts raw data from multiple CSV sources (e.g., CRM and ERP systems), processes it using **Apache Spark**, and organizes it into three logical layers in a data warehouse:
+The system extracts raw data from multiple CSV sources (e.g., CRM and ERP systems), processes it using **Apache Spark**, and organizes it into three logical layers in a data lakehouse:
 
 - **Bronze Layer**: Raw, unprocessed data
 - **Silver Layer**: Cleaned, structured data in dimensional format (fact and dimension tables)
 - **Gold Layer**: Business-level aggregated data, accessible via views for reporting
 
-Data is then loaded into **PostgreSQL** and visualized using **Power BI**.
+Data is then loaded into **Minio, PostgreSQL** and visualized using **Power BI**.
+
+**Minio** contains **Bronze Layer** and **Silver Layer**.
+
+**PostgreSQL** contains **Silver layer** and **Gold Layer**.
+
 
 ---
 ## 🗺️ System Architecture
-![Data Pipeline](/image/system%20architecture.png)
+![Data Pipeline](/image/system_architecture.png)
 
 ## 🧱 Architecture Layers
 
@@ -42,7 +47,8 @@ Data is then loaded into **PostgreSQL** and visualized using **Power BI**.
 | Component      | Description |
 |----------------|-------------|
 | **Apache Spark** | Reads, transforms, and loads data across all layers. |
-| **PostgreSQL**   | Stores the processed Silver and Gold layer tables. |
+| **Minio**        | Stores Bronze and Silver layer. |
+| **PostgreSQL**   | Stores Silver and Gold layer. |
 | **Power BI**     | Connects to PostgreSQL for final reporting and dashboards. |
 | **Docker**       | Manages containerized deployment for all services. |
 
@@ -54,7 +60,8 @@ Data is then loaded into **PostgreSQL** and visualized using **Power BI**.
 2. Spark extracts the raw data into the **Bronze Layer**.
 3. Transformed and cleaned data (dim/fact tables) are written to the **Silver Layer**.
 4. Business views and aggregations are generated in the **Gold Layer**.
-5. All processed data is stored in **PostgreSQL**.
+5. All data of **Bronze Layer** and **Silver Layer** is stored in **Minio**.
+6. Load data from **Silver Layer** and **Gold Layer** into **PostgreSQL**.
 6. **Power BI** connects to PostgreSQL to create dashboards and reports.
 
 ---
@@ -99,6 +106,8 @@ Start the containers:
 ```sh
 docker-compose up -d
 ```
+Connect to http://localhost:9001, create a bucket named **data**, generate an **access key** and **secret key**, and then write them to the minio.env file as **MINIO_ACCESS_KEY** and **MINIO_SECRET_KEY**.
+
 🧠 Access the spark-master container:
 ```sh 
 docker exec -it spark-master /bin/bash
@@ -143,22 +152,22 @@ docker exec -it postgresql /bin/bash
 ```
 ##### Run each SQL file to create views:
 ```sh 
-psql -U datawarehouse -d datawarehouse -f gold/customer_segmentation_age.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/customer_segmentation_age.sql
 ```
 ```sh
-psql -U datawarehouse -d datawarehouse -f gold/monthly_active_customers.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/monthly_active_customers.sql
 ```
 ```sh 
-psql -U datawarehouse -d datawarehouse -f gold/potential_customer.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/potential_customer.sql
 ```
 ```sh 
-psql -U datawarehouse -d datawarehouse -f gold/product_sales_ranking.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/product_sales_ranking.sql
 ```
 ```sh
-psql -U datawarehouse -d datawarehouse -f gold/revenue_by_month_year.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/revenue_by_month_year.sql
 ```
 ```sh 
-psql -U datawarehouse -d datawarehouse -f gold/slaes_by_region.sql
+psql -U datawarehouse -d datawarehouse -f gold_layer/slaes_by_region.sql
 ```
 ---
 ## 📊 Reporting
