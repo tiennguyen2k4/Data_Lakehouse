@@ -92,7 +92,7 @@ Data is then loaded into **Minio, PostgreSQL** and visualized using **Power BI**
 
 ### 🔁 Clone the repository:
 ```sh 
-git clone https://github.com/tiennguyen2k4/Data-Lakehouse.git
+git clone https://github.com/tiennguyen2k4/Data_Lakehouse.git
 ```
 This project runs in a **Dockerized environment**. To start the services:
 ```sh
