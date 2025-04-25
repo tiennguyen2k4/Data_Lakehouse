@@ -30,7 +30,7 @@ Data is then loaded into **Minio, PostgreSQL** and visualized using **Power BI**
 
 ### 🥈 Silver Layer
 - Contains **fact and dimension tables**, such as:
-  - `dim_customer`, `dim_product`.
+  - `dim_customer`, `dim_product`, `dim_date`.
   - `fact_sales`.
 - Data is cleaned, normalized, and modeled using Spark.
 - Ready for business analysis and visualization.
