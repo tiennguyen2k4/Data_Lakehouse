@@ -74,19 +74,6 @@ Data is then loaded into **Minio, PostgreSQL** and visualized using **Power BI**
 
 ---
 
-## 📈 Example Views in the Gold Layer
-
-- `monthly_active_customers.sql`
-![Data Pipeline](/image/monthly_active_customer.png)
-- `sales_by_region`
-![Data Pipeline](/image/sales_by_region.png)
-- `customer_segmentation_age`
-![Data Pipeline](/image/customer_segmentation_age.png)
-- `revenue_by_month_year`
-![Data Pipeline](/image/revenue_by_month_year.png)
-
-
----
 
 ## 🚀 Getting Started
 
